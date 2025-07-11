@@ -1,1 +1,22 @@
-body { font-family: Arial; background: #f0f0f0; text-align: center; }
+body {
+    font-family: sans-serif;
+    margin: 30px;
+    background-color: #f6f6f6;
+}
+
+h1 {
+    color: #333;
+}
+
+#log {
+    background: white;
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-bottom: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+p {
+    margin: 5px 0;
+}
