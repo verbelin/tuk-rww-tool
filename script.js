@@ -1,91 +1,62 @@
-let logDiv = document.getElementById("log");
-let messdaten = [];
-let startzeitTUK = null;
-let startzeitTUS = null;
-let audioMap = {
-    pip: "sounds/pip.wav",
-    tukdone: "sounds/tuk_done.wav",
-    tusdone: "sounds/tus_done.wav",
-    saved: "sounds/saved.wav",
-};
+let daten = [];
+let tukBündel = {};
 
-function playSound(name) {
-    const audio = new Audio(audioMap[name]);
-    audio.play();
+function erfasseDaten() {
+  const tuk = parseFloat(document.getElementById("tuk").value);
+  const tus = parseFloat(document.getElementById("tus").value);
+  const seite = document.getElementById("seite").value;
+  const zahl = parseInt(document.getElementById("zahl").value);
+
+  if (isNaN(tuk) || isNaN(tus) || isNaN(zahl)) {
+    alert("Bitte alle Felder korrekt ausfüllen.");
+    return;
+  }
+
+  const normierteTUS = 3.5;
+  const restzeit = +(tuk + (normierteTUS - tus)).toFixed(2);
+
+  daten.push({ tuk, tus, seite, zahl, restzeit });
+
+  const tukKey = tuk.toFixed(2);
+  if (!tukBündel[tukKey]) tukBündel[tukKey] = { L: [], R: [] };
+  tukBündel[tukKey][seite].push(restzeit);
+
+  speichereDaten();
 }
 
-function log(text) {
-    const p = document.createElement("p");
-    p.textContent = text;
-    logDiv.appendChild(p);
-    console.log(text);
+function speichereDaten() {
+  const csv = daten.map(d => `${d.tuk};${d.tus};${d.seite};${d.zahl};${d.restzeit}`).join("\n");
+  const blob = new Blob(["TUK;TUS;Seite;Zahl;Restzeit\n" + csv], { type: "text/csv" });
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "kalibrierdaten.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Neue Analyse nach jedem Datensatz
+  zeigeRestzeitVerteilung();
 }
 
-document.addEventListener("keydown", (event) => {
-    if (event.key === "s") {
-        // TUK-Messung
-        if (startzeitTUK === null) {
-            startzeitTUK = Date.now();
-            log("TUK gestartet");
-            playSound("pip");
-        } else {
-            let dauer = (Date.now() - startzeitTUK) / 1000;
-            startzeitTUK = Date.now(); // für nächste Runde
-            messdaten.push({ typ: "TUK", sekunden: dauer.toFixed(2) });
-            log(`TUK: ${dauer.toFixed(2)} s`);
-            playSound("pip");
+// Funktion: Häufigkeitsverteilung der Restzeiten anzeigen
+function zeigeRestzeitVerteilung() {
+  for (const tukKey in tukBündel) {
+    console.log(`TUK: ${tukKey}`);
+    ['L', 'R'].forEach(seite => {
+      const werte = tukBündel[tukKey][seite];
+      if (werte.length === 0) return;
 
-            if (messdaten.filter(e => e.typ === "TUK").length === 6) {
-                log("TUK-Messung abgeschlossen");
-                playSound("tukdone");
-                startzeitTUK = null;
-            }
-        }
-    }
+      const verteilung = {};
+      werte.forEach(wert => {
+        const key = wert.toFixed(1); // auf 0.1 Sekunden runden
+        verteilung[key] = (verteilung[key] || 0) + 1;
+      });
 
-    if (event.key === "a") {
-        // TUS-Messung
-        if (startzeitTUS === null) {
-            startzeitTUS = Date.now();
-            log("TUS gestartet");
-            playSound("pip");
-        } else {
-            let dauer = (Date.now() - startzeitTUS) / 1000;
-            startzeitTUS = null;
-            let wert = dauer < 2.5 ? dauer * 2 : dauer;
-            messdaten.push({ typ: "TUS", sekunden: wert.toFixed(2) });
-            log(`TUS: ${wert.toFixed(2)} s`);
-            playSound("tusdone");
-        }
-    }
-
-    if (event.key === "z") {
-        // Speichern
-        if (messdaten.length > 0) {
-            log("Messdaten gespeichert");
-            playSound("saved");
-        } else {
-            log("Keine Daten zum Speichern");
-        }
-    }
-});
-
-function exportCSV() {
-    if (messdaten.length === 0) {
-        alert("Keine Daten zum Exportieren.");
-        return;
-    }
-
-    let csvContent = "data:text/csv;charset=utf-8,Typ;Sekunden\n";
-    messdaten.forEach(e => {
-        csvContent += `${e.typ};${e.sekunden}\n`;
+      console.log(`  Seite ${seite}:`);
+      for (const key in verteilung) {
+        console.log(`    Restzeit ${key}s → ${verteilung[key]}x`);
+      }
     });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "messdaten.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  }
 }
